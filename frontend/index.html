@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#12071F">
+<title>Orbe · Tus tareas</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%231E0A38'/%3E%3Cpath d='M2 36q15-10 30 0t30 0v28H2z' fill='%238B5CF6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #12071f; --surface: #1c0f2e; --surface-2: #28163f; --line: #3b2559;
+    --ink: #f3ecff; --muted: #a998cc; --glow: #7c3aed;
+    --btn: #7c3aed; --btn-hover: #8b5cf6; --btn-ink: #ffffff;
+    --accent: #c4a1ff; --danger: #ff7a9c; --focus: #c4a1ff;
+    --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+    --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5efff; --surface: #ffffff; --surface-2: #ece2ff; --line: #d9c9f6;
+      --ink: #20103a; --muted: #6a5890; --glow: #a78bfa;
+      --btn: #6d28d9; --btn-hover: #5b21b6; --accent: #6d28d9; --danger: #c0275b; --focus: #6d28d9;
+    }
+    meta[name=theme-color] { content: "#f5efff"; }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; overflow-x: clip; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 var(--font-body);
+  }
+  body::before {
+    content: ""; position: fixed; inset: -20% auto auto -10%; width: 70vmax; height: 70vmax; z-index: -1;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 28%, transparent), transparent);
+    pointer-events: none;
+  }
+  .hidden { display: none !important; }
+
+  /* ---------- estructura ---------- */
+  .shell {
+    max-width: 1120px; margin: 0 auto; padding: 28px 20px 72px;
+    display: grid; gap: 28px; grid-template-columns: 1fr;
+  }
+  @media (min-width: 900px) {
+    .shell { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 64px; padding-top: 48px; }
+    .side { position: sticky; top: 40px; align-self: start; }
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font: 700 1.35rem/1 var(--font-display); letter-spacing: -.01em; }
+  .brand svg { width: 28px; height: 28px; }
+
+  /* ---------- el orbe (lo memorable) ---------- */
+  .orb { position: relative; width: min(100%, 320px); aspect-ratio: 1; margin: 28px auto 20px; }
+  @media (max-width: 899px) { .orb { width: 200px; margin: 18px 0 8px; } }
+  .orb::before {
+    content: ""; position: absolute; inset: -14%; border-radius: 50%; z-index: -1;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 55%, transparent), transparent 70%);
+    opacity: .55; transition: opacity .8s;
+  }
+  .orb.pulse::before { animation: halo 2.2s ease-out 1; }
+  @keyframes halo { 0% { opacity: .55; transform: scale(1); } 30% { opacity: 1; transform: scale(1.18); } 100% { opacity: .55; transform: scale(1); } }
+  .orb svg { width: 100%; height: 100%; display: block; overflow: visible; animation: float 7s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-6px); } }
+  .orb .well { fill: #1e0a38; stroke: url(#rim); stroke-width: 2.5; }
+  .orb .liquid { transition: transform 1.5s cubic-bezier(.2, .8, .2, 1); transform: translateY(calc((1 - var(--lvl, 0)) * 200px - 10px)); }
+  .orb .wave { animation: drift 7s linear infinite; }
+  .orb .wave.back { animation-duration: 11s; animation-direction: reverse; }
+  @keyframes drift { to { transform: translateX(-100px); } }
+  .orb-num {
+    position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: #fff;
+    font-family: var(--font-display); font-weight: 800; font-variation-settings: "opsz" 96;
+    font-size: clamp(3.4rem, 9vw, 5rem); line-height: 1; letter-spacing: -.04em;
+    text-shadow: 0 2px 16px rgba(20, 5, 40, .75);
+    transition: opacity .4s;
+  }
+  .orb-num i { font-style: normal; font-size: .42em; font-weight: 600; margin-left: .08em; opacity: .85; }
+  .orb.idle .orb-num { opacity: 0; }
+
+  .side-text h1 { font: 700 clamp(1.8rem, 4vw, 2.5rem)/1.05 var(--font-display); letter-spacing: -.025em; margin: 0 0 10px; overflow-wrap: anywhere; }
+  .side-text p { margin: 0; color: var(--muted); max-width: 30ch; }
+
+  /* ---------- componentes ---------- */
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 22px; }
+  .card + .card, .card + .toolbar, .toolbar + .card { margin-top: 16px; }
+  h2 { font: 700 1.2rem/1.2 var(--font-display); margin: 0 0 14px; letter-spacing: -.01em; }
+  label { display: block; font-size: .88rem; font-weight: 500; color: var(--muted); margin: 14px 0 6px; }
+  input[type=text], input[type=password], textarea {
+    width: 100%; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line);
+    background: var(--surface-2); color: var(--ink); font: inherit;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
+  textarea { resize: vertical; min-height: 76px; }
+  input:focus, textarea:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus) 25%, transparent); }
+  button { font: inherit; cursor: pointer; color: inherit; }
+  button:focus-visible, input[type=checkbox]:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .btn {
+    border: 0; border-radius: 12px; padding: 11px 20px; font-weight: 600;
+    background: var(--btn); color: var(--btn-ink); transition: background .15s, transform .1s;
+  }
+  .btn:hover { background: var(--btn-hover); }
+  .btn:active { transform: translateY(1px); }
+  .btn.wide { width: 100%; padding: 13px 20px; margin-top: 18px; }
+  .btn.small, .ghost { padding: 6px 12px; font-size: .88rem; }
+  .ghost { background: transparent; border: 1.5px solid var(--line); border-radius: 10px; font-weight: 500; transition: border-color .15s, color .15s, background .15s; }
+  .ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .ghost.danger:hover, .ghost.armed { border-color: var(--danger); color: var(--danger); }
+  .ghost.armed { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; min-width: 0; }
+  .msg { margin: 14px 0 0; min-height: 1.3em; font-size: .92rem; }
+  .msg.error { color: var(--danger); }
+  .msg.ok { color: var(--accent); }
+  .muted { color: var(--muted); font-size: .9rem; }
+
+  /* control segmentado (acceso y filtros) */
+  .seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); max-width: 100%; overflow-x: auto; }
+  .seg button { border: 0; background: transparent; padding: 7px 16px; border-radius: 999px; font-weight: 500; font-size: .92rem; white-space: nowrap; color: var(--muted); transition: background .2s, color .2s; }
+  .seg button[aria-selected=true] { background: var(--btn); color: var(--btn-ink); }
+  .seg button:not([aria-selected=true]):hover { color: var(--ink); }
+  .seg b { font-weight: 600; margin-left: 5px; opacity: .8; }
+
+  .userbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 18px; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 700 .95rem var(--font-display); background: linear-gradient(140deg, #a78bfa, #5b21b6); color: #fff; text-transform: uppercase; }
+  .tag { display: inline-block; font-size: .72rem; font-weight: 600; padding: 2px 9px; border-radius: 99px; background: var(--surface-2); color: var(--accent); border: 1px solid var(--line); vertical-align: middle; }
+
+  .composer .title-row { display: flex; gap: 10px; }
+  .composer input[type=text] { font-size: 1.08rem; padding: 14px 16px; }
+  .link { background: none; border: 0; padding: 0; margin-top: 12px; color: var(--accent); font-size: .9rem; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+  .composer textarea { margin-top: 10px; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px !important; }
+  .toolbar h2 { margin: 0; }
+
+  /* ---------- lista de tareas ---------- */
+  ul { list-style: none; margin: 0; padding: 0; }
+  li.task { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: start; padding: 16px 0; border-top: 1px solid var(--line); }
+  li.task:first-child { border-top: 0; padding-top: 4px; }
+  li.task:last-child { padding-bottom: 4px; }
+  li.task.editing { grid-template-columns: 1fr; }
+  .title { font-weight: 600; font-size: 1.05rem; overflow-wrap: anywhere; transition: color .3s; }
+  .desc { color: var(--muted); font-size: .94rem; overflow-wrap: anywhere; white-space: pre-wrap; margin-top: 2px; }
+  li.task.done .title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
+  li.task.done .desc { opacity: .7; }
+  .actions { display: flex; gap: 6px; }
+  @media (max-width: 520px) { li.task { grid-template-columns: auto 1fr; } .actions { grid-column: 2; } }
+
+  input[type=checkbox] {
+    appearance: none; -webkit-appearance: none; margin: 2px 0 0; width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid var(--accent); background: transparent; cursor: pointer; position: relative;
+    transition: background .25s, border-color .25s, transform .25s cubic-bezier(.3, 1.6, .5, 1);
+  }
+  input[type=checkbox]:hover { transform: scale(1.08); }
+  input[type=checkbox]:checked { background: linear-gradient(140deg, #a78bfa, #6d28d9); border-color: transparent; }
+  input[type=checkbox]:checked::after {
+    content: ""; position: absolute; left: 8px; top: 4px; width: 6px; height: 12px;
+    border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+  }
+  .empty { text-align: center; padding: 26px 8px 18px; color: var(--muted); }
+  .empty strong { display: block; color: var(--ink); font: 700 1.1rem var(--font-display); margin-bottom: 4px; }
+
+  .spark { position: fixed; width: 9px; height: 9px; border-radius: 50%; pointer-events: none; z-index: 50; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#1e0a38" stroke="#8b5cf6" stroke-width="3"/><path d="M4 36q14-10 28 0t28 0v24H4z" fill="#8b5cf6"/></svg>
+      Orbe
+    </div>
+
+    <div class="orb idle" id="orb" role="img" aria-label="Orbe de progreso">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <defs>
+          <clipPath id="clip"><circle cx="100" cy="100" r="96"/></clipPath>
+          <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#9061f9"/><stop offset="1" stop-color="#5b21b6"/>
+          </linearGradient>
+          <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#d9c2ff"/><stop offset="1" stop-color="#6d28d9"/>
+          </linearGradient>
+          <radialGradient id="shine" cx=".3" cy=".25" r=".6">
+            <stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle class="well" cx="100" cy="100" r="96"/>
+        <g clip-path="url(#clip)">
+          <g class="liquid">
+            <path class="wave back" fill="#c4a1ff" fill-opacity=".45" transform="translate(0 -5)"
+              d="M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 T250 10 T300 10 T350 10 T400 10 V240 H0 Z"/>
+            <path class="wave front" fill="url(#fill)"
+              d="M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 T250 10 T300 10 T350 10 T400 10 V240 H0 Z"/>
+          </g>
+        </g>
+        <circle cx="100" cy="100" r="96" fill="url(#shine)"/>
+      </svg>
+      <div class="orb-num"><span><b id="pct" style="font-weight:inherit">0</b><i>%</i></span></div>
+    </div>
+
+    <div class="side-text">
+      <h1 id="orb-title">Llena el orbe.</h1>
+      <p id="orb-sub">Cada tarea que terminas sube el nivel. Entra para ver el tuyo.</p>
+    </div>
+  </aside>
+
+  <main>
+    <!-- Acceso -->
+    <section id="auth-view" class="card">
+      <div class="seg" role="tablist" aria-label="Acceso">
+        <button id="tab-login" role="tab" aria-selected="true">Iniciar sesión</button>
+        <button id="tab-register" role="tab" aria-selected="false">Crear cuenta</button>
+      </div>
+      <form id="auth-form" autocomplete="on">
+        <label for="username">Usuario</label>
+        <input id="username" type="text" autocomplete="username" required minlength="3" maxlength="50">
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" autocomplete="current-password" required minlength="8" maxlength="100">
+        <p class="muted" id="auth-hint" style="margin:10px 0 0"></p>
+        <button id="auth-submit" type="submit" class="btn wide">Entrar</button>
+        <p id="auth-msg" class="msg" role="status"></p>
+      </form>
+    </section>
+
+    <!-- Tareas -->
+    <section id="tasks-view" class="hidden">
+      <div class="userbar" id="userbox">
+        <span class="avatar" id="avatar" aria-hidden="true"></span>
+        <span id="whoami"></span>
+        <button id="logout" class="ghost">Cerrar sesión</button>
+      </div>
+
+      <form id="new-task" class="card composer">
+        <div class="title-row">
+          <input id="new-title" type="text" required maxlength="120" placeholder="¿Qué sigue?" aria-label="Título de la nueva tarea">
+          <button type="submit" class="btn">Agregar</button>
+        </div>
+        <button type="button" id="toggle-desc" class="link" aria-expanded="false">Añadir detalle</button>
+        <textarea id="new-desc" class="hidden" maxlength="1000" placeholder="Detalle de la tarea" aria-label="Detalle de la tarea"></textarea>
+      </form>
+
+      <div class="toolbar">
+        <h2>Tareas</h2>
+        <div class="seg" role="tablist" aria-label="Filtro">
+          <button role="tab" data-filter="all" aria-selected="true">Todas<b id="n-all"></b></button>
+          <button role="tab" data-filter="pending" aria-selected="false">Pendientes<b id="n-pending"></b></button>
+          <button role="tab" data-filter="done" aria-selected="false">Hechas<b id="n-done"></b></button>
+        </div>
+      </div>
+
+      <div class="card">
+        <ul id="list"></ul>
+        <div id="empty" class="empty hidden"><strong id="empty-title"></strong><span id="empty-text"></span></div>
+        <p id="tasks-msg" class="msg" role="status"></p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var $ = function (s) { return document.querySelector(s); };
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var state = { mode: "login", tasks: [], editingId: null, admin: false, filter: "all", name: "", lastPct: null, raf: 0 };
+
+  // ---- token (localStorage puede no estar disponible) ----
+  function getToken() { try { return localStorage.getItem("token"); } catch (e) { return null; } }
+  function setToken(t) {
+    try { if (t) localStorage.setItem("token", t); else localStorage.removeItem("token"); } catch (e) {}
+  }
+  function decode(token) {
+    try {
+      var p = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      return JSON.parse(atob(p));
+    } catch (e) { return null; }
+  }
+
+  // ---- llamadas a la API (nginx las redirige a auth-service y task-service) ----
+  function api(path, options) {
+    options = options || {};
+    var headers = { "Content-Type": "application/json" };
+    var token = getToken();
+    if (token) headers["Authorization"] = "Bearer " + token;
+    return fetch(path, { method: options.method || "GET", headers: headers, body: options.body })
+      .then(function (res) {
+        if (res.status === 204) return null;
+        return res.text().then(function (text) {
+          var data = null;
+          try { data = text ? JSON.parse(text) : null; } catch (e) {}
+          if (!res.ok) {
+            var err = new Error((data && data.message) || "Error " + res.status);
+            err.status = res.status;
+            throw err;
+          }
+          return data;
+        });
+      });
+  }
+
+  function setMsg(el, text, kind) {
+    el.textContent = text || "";
+    el.className = "msg" + (kind ? " " + kind : "");
+  }
+
+  // ---- el orbe ----
+  var orb = $("#orb");
+
+  function showPct(target) {
+    var out = $("#pct");
+    var from = parseInt(out.textContent, 10) || 0;
+    cancelAnimationFrame(state.raf);
+    if (reduce || from === target) { out.textContent = target; return; }
+    var start = performance.now();
+    (function step(now) {
+      var t = Math.min(1, (now - start) / 1300);
+      var eased = 1 - Math.pow(1 - t, 3);
+      out.textContent = Math.round(from + (target - from) * eased);
+      if (t < 1) state.raf = requestAnimationFrame(step);
+    })(start);
+  }
+
+  function setOrb(pct, idle) {
+    orb.classList.toggle("idle", !!idle);
+    orb.style.setProperty("--lvl", pct / 100);
+    showPct(idle ? 0 : pct);
+    orb.setAttribute("aria-label", idle ? "Orbe de progreso" : "Progreso: " + pct + "% de las tareas completadas");
+  }
+
+  function spark(x, y, color, angle, dist) {
+    var s = document.createElement("span");
+    s.className = "spark";
+    s.style.left = x + "px"; s.style.top = y + "px"; s.style.background = color;
+    document.body.appendChild(s);
+    var a = s.animate([
+      { transform: "translate(-50%,-50%) scale(1)", opacity: 1 },
+      { transform: "translate(calc(-50% + " + Math.cos(angle) * dist + "px), calc(-50% + " + Math.sin(angle) * dist + "px)) scale(.15)", opacity: 0 }
+    ], { duration: 600 + Math.random() * 400, easing: "cubic-bezier(.15,.8,.3,1)" });
+    a.onfinish = function () { s.remove(); };
+  }
+
+  function burst(x, y, count, spread) {
+    if (reduce || !document.body.animate) return;
+    var colors = ["#c4a1ff", "#8b5cf6", "#e9d8ff", "#7c3aed", "#a78bfa"];
+    for (var i = 0; i < count; i++) {
+      spark(x, y, colors[i % colors.length], (Math.PI * 2 * i) / count + Math.random() * 0.4, spread * (0.55 + Math.random() * 0.6));
+    }
+  }
+
+  function celebrate() {
+    var r = orb.getBoundingClientRect();
+    orb.classList.remove("pulse"); void orb.offsetWidth; orb.classList.add("pulse");
+    burst(r.left + r.width / 2, r.top + r.height / 2, 28, Math.min(r.width, 240));
+  }
+
+  // ---- vistas ----
+  function showAuth() {
+    $("#auth-view").classList.remove("hidden");
+    $("#tasks-view").classList.add("hidden");
+    state.lastPct = null;
+    $("#orb-title").textContent = "Llena el orbe.";
+    $("#orb-sub").textContent = "Cada tarea que terminas sube el nivel. Entra para ver el tuyo.";
+    setOrb(38, true);
+  }
+  function showTasks() {
+    var claims = decode(getToken());
+    var roles = (claims && claims.roles) || [];
+    state.admin = roles.indexOf("ADMIN") !== -1;
+    state.name = claims ? claims.sub : "";
+    $("#whoami").textContent = state.name + (state.admin ? " (admin)" : "");
+    $("#avatar").textContent = state.name.charAt(0);
+    $("#auth-view").classList.add("hidden");
+    $("#tasks-view").classList.remove("hidden");
+    $("#orb-title").textContent = "Hola, " + state.name;
+    loadTasks();
+  }
+  function logout(message) {
+    setToken(null);
+    state.tasks = [];
+    state.editingId = null;
+    showAuth();
+    setMsg($("#auth-msg"), message || "", message ? "error" : "");
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    var login = mode === "login";
+    $("#tab-login").setAttribute("aria-selected", login);
+    $("#tab-register").setAttribute("aria-selected", !login);
+    $("#auth-submit").textContent = login ? "Entrar" : "Crear cuenta";
+    $("#password").setAttribute("autocomplete", login ? "current-password" : "new-password");
+    $("#auth-hint").textContent = login ? "" : "Usuario: mínimo 3 caracteres. Contraseña: mínimo 8.";
+    setMsg($("#auth-msg"), "");
+  }
+
+  // ---- autenticación ----
+  function login(username, password) {
+    return api("/api/auth/login", { method: "POST", body: JSON.stringify({ username: username, password: password }) })
+      .then(function (data) { setToken(data.access_token); showTasks(); });
+  }
+
+  $("#tab-login").addEventListener("click", function () { setMode("login"); });
+  $("#tab-register").addEventListener("click", function () { setMode("register"); });
+
+  $("#auth-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var username = $("#username").value.trim();
+    var password = $("#password").value;
+    var msg = $("#auth-msg");
+    setMsg(msg, "");
+
+    var action;
+    if (state.mode === "register") {
+      action = api("/api/auth/register", { method: "POST", body: JSON.stringify({ username: username, password: password }) })
+        .then(function () { return login(username, password); });
+    } else {
+      action = login(username, password);
+    }
+    action.then(function () { $("#password").value = ""; })
+      .catch(function (err) {
+        if (err.status === 401) setMsg(msg, "Usuario o contraseña incorrectos.", "error");
+        else if (err.status === 409) setMsg(msg, "Ese usuario ya existe.", "error");
+        else if (err.status === 400) setMsg(msg, "Revisa los datos: usuario mínimo 3 caracteres y contraseña mínimo 8.", "error");
+        else setMsg(msg, "No se pudo conectar con el servidor.", "error");
+      });
+  });
+
+  $("#logout").addEventListener("click", function () { logout(); });
+
+  // ---- tareas ----
+  function handleTaskError(err) {
+    if (err.status === 401) return logout("Tu sesión expiró. Inicia sesión de nuevo.");
+    setMsg($("#tasks-msg"), err.status === 404 ? "La tarea ya no existe." : "No se pudo completar la acción.", "error");
+    if (err.status === 404) loadTasks();
+  }
+
+  function loadTasks() {
+    api("/api/tasks").then(function (tasks) {
+      state.tasks = tasks;
+      setMsg($("#tasks-msg"), "");
+      render();
+    }).catch(handleTaskError);
+  }
+
+  function updateTask(t, changes) {
+    var body = {
+      title: changes.title !== undefined ? changes.title : t.title,
+      description: changes.description !== undefined ? changes.description : t.description,
+      completed: changes.completed !== undefined ? changes.completed : t.completed
+    };
+    return api("/api/tasks/" + t.id, { method: "PUT", body: JSON.stringify(body) });
+  }
+
+  $("#toggle-desc").addEventListener("click", function () {
+    var area = $("#new-desc");
+    var open = area.classList.toggle("hidden") === false;
+    this.setAttribute("aria-expanded", open);
+    this.textContent = open ? "Quitar detalle" : "Añadir detalle";
+    if (open) area.focus();
+  });
+
+  $("#new-task").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var title = $("#new-title").value.trim();
+    var desc = $("#new-desc").value.trim();
+    if (!title) return;
+    api("/api/tasks", { method: "POST", body: JSON.stringify({ title: title, description: desc || null, completed: false }) })
+      .then(function () {
+        $("#new-title").value = "";
+        $("#new-desc").value = "";
+        $("#new-title").focus();
+        loadTasks();
+      }).catch(handleTaskError);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-filter]"), function (b) {
+    b.addEventListener("click", function () { state.filter = b.getAttribute("data-filter"); render(); });
+  });
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  function button(label, cls, onClick) {
+    var b = el("button", cls, label);
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  function deleteButton(t) {
+    var armed = false, timer = 0;
+    var b = button("Borrar", "ghost danger small", function () {
+      if (!armed) {
+        armed = true; b.textContent = "¿Seguro?"; b.classList.add("armed");
+        timer = setTimeout(function () { armed = false; b.textContent = "Borrar"; b.classList.remove("armed"); }, 3000);
+        return;
+      }
+      clearTimeout(timer);
+      api("/api/tasks/" + t.id, { method: "DELETE" }).then(loadTasks).catch(handleTaskError);
+    });
+    return b;
+  }
+
+  var EMPTY = {
+    all: ["Aquí empieza el orbe", "Escribe tu primera tarea arriba y empieza a llenarlo."],
+    pending: ["Nada pendiente", "Terminaste todo lo que había. El orbe lo sabe."],
+    done: ["Aún no terminas ninguna", "Marca una tarea con el círculo y mira subir el nivel."]
+  };
+
+  function updateSide(total, done, pct) {
+    var sub;
+    if (total === 0) sub = "Agrega tu primera tarea para empezar a llenar el orbe.";
+    else if (pct === 100) sub = "Orbe lleno. Terminaste todas tus tareas.";
+    else {
+      var left = total - done;
+      sub = "Quedan " + left + " por hacer. Llevas " + done + " de " + total + ".";
+    }
+    $("#orb-sub").textContent = sub;
+  }
+
+  function render() {
+    var total = state.tasks.length;
+    var done = state.tasks.filter(function (t) { return t.completed; }).length;
+    var pct = total ? Math.round((done / total) * 100) : 0;
+
+    setOrb(pct, false);
+    updateSide(total, done, pct);
+    if (state.lastPct !== null && state.lastPct !== 100 && pct === 100 && total > 0) celebrate();
+    state.lastPct = pct;
+
+    $("#n-all").textContent = total;
+    $("#n-pending").textContent = total - done;
+    $("#n-done").textContent = done;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-filter]"), function (b) {
+      b.setAttribute("aria-selected", b.getAttribute("data-filter") === state.filter);
+    });
+
+    var visible = state.tasks.filter(function (t) {
+      return state.filter === "all" || (state.filter === "done" ? t.completed : !t.completed);
+    });
+    // pendientes primero; dentro de cada grupo se conserva el orden de creación
+    visible = visible.slice().sort(function (a, b) { return (a.completed === b.completed) ? a.id - b.id : (a.completed ? 1 : -1); });
+
+    var list = $("#list");
+    list.innerHTML = "";
+    var empty = visible.length === 0;
+    $("#empty").classList.toggle("hidden", !empty);
+    if (empty) {
+      var texts = (total === 0) ? EMPTY.all : EMPTY[state.filter];
+      $("#empty-title").textContent = texts[0];
+      $("#empty-text").textContent = texts[1];
+    }
+
+    visible.forEach(function (t) {
+      var li = el("li", "task" + (t.completed ? " done" : "") + (state.editingId === t.id ? " editing" : ""));
+
+      if (state.editingId === t.id) {
+        var form = el("div", "body");
+        var title = el("input"); title.type = "text"; title.value = t.title; title.maxLength = 120;
+        title.setAttribute("aria-label", "Título");
+        var desc = el("textarea"); desc.value = t.description || ""; desc.maxLength = 1000; desc.style.marginTop = "10px";
+        desc.setAttribute("aria-label", "Detalle");
+        var row = el("div", "row"); row.style.marginTop = "12px";
+        row.appendChild(button("Guardar", "btn small", function () {
+          if (!title.value.trim()) return;
+          updateTask(t, { title: title.value.trim(), description: desc.value.trim() || null })
+            .then(function () { state.editingId = null; loadTasks(); })
+            .catch(handleTaskError);
+        }));
+        row.appendChild(button("Cancelar", "ghost", function () { state.editingId = null; render(); }));
+        form.appendChild(title); form.appendChild(desc); form.appendChild(row);
+        li.appendChild(form);
+      } else {
+        var check = el("input"); check.type = "checkbox"; check.checked = t.completed;
+        check.setAttribute("aria-label", "Marcar «" + t.title + "» como completada");
+        check.addEventListener("change", function () {
+          if (check.checked) {
+            var r = check.getBoundingClientRect();
+            burst(r.left + r.width / 2, r.top + r.height / 2, 12, 46);
+          }
+          updateTask(t, { completed: check.checked }).then(loadTasks).catch(handleTaskError);
+        });
+
+        var body = el("div", "body");
+        var head = el("div", "title", t.title);
+        if (state.admin) { head.appendChild(document.createTextNode(" ")); head.appendChild(el("span", "tag", t.owner)); }
+        body.appendChild(head);
+        if (t.description) body.appendChild(el("div", "desc", t.description));
+
+        var actions = el("div", "actions");
+        actions.appendChild(button("Editar", "ghost small", function () { state.editingId = t.id; render(); }));
+        actions.appendChild(deleteButton(t));
+
+        li.appendChild(check); li.appendChild(body); li.appendChild(actions);
+      }
+      list.appendChild(li);
+    });
+  }
+
+  // ---- arranque ----
+  setMode("login");
+  var existing = getToken();
+  var claims = existing && decode(existing);
+  if (claims && claims.exp * 1000 > Date.now()) showTasks(); else { setToken(null); showAuth(); }
+})();
+</script>
+</body>
+</html>
